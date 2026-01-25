@@ -68,9 +68,9 @@ If you discover a security vulnerability, please report it responsibly.
 
 Instead, contact:
 - GitHub: open a private security advisory, or
-- Email: `security@asti-chain.com` (replace if preferred)
+- Email: `asticrat@gmail.com` 
 
-We will investigate promptly and coordinate a fix.
+I will investigate promptly and coordinate a fix.
 
 ---
 
