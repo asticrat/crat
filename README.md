@@ -3,6 +3,8 @@
 ## Overview
 **Crat** is a browser-based vanity address generator for the Solana blockchain. It allows users to generate custom wallet addresses (starting or ending with specific characters) directly in their browser without sending private keys over the network.
 
+**Live Demo:** [asti-chain.com](https://asti-chain.com)
+
 ## Architecture
 
 ### 1. Core Technology Stack
@@ -48,4 +50,4 @@ npm run build
 ```
 
 ## License
-MIT
+Apache 2.0
