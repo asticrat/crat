@@ -9,7 +9,7 @@ import readline from 'readline';
 import cluster from 'cluster';
 import os from 'os';
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 // --- Worker Logic ---
@@ -70,18 +70,16 @@ if (cluster.isWorker) {
 
     program
         .name('crat')
-        .version(VERSION, '-v, --version') // Enable -v
-        .usage('gen [options] [pattern]')
+        .version(VERSION, '-v, --version')
+        .usage('gen -[custom char] -[position : start/end] -[case senseitive: casey for yes and casen for no]')
         .helpOption('-h, --help', 'display help for command');
-
-    // Remove default description to clean up help
-    // program.description('') -> creates empty line, maybe avoid calling description at all
 
     program
         .command('gen')
-        .description('Generate a vanity address')
-        .argument('[pattern]', 'The pattern to search for')
-        .option('--char <pattern>', 'The pattern to search for (Alternative to positional)')
+        .description('Generate a custom address')
+        .usage('-[custom char] -[position : start/end] -[case senseitive: casey for yes and casen for no]')
+        .argument('[pattern]', 'The custom chars to search for')
+        .option('--char <pattern>', 'The custom chars to search for')
         .option('-p, --pos <position>', 'Position: "start" or "end"', 'start')
         .option('-y, --casey', 'Case Sensitive search')
         .option('-n, --casen', 'Case Insensitive search')
@@ -90,9 +88,8 @@ if (cluster.isWorker) {
             let pattern = posPattern || options.char;
 
             if (!pattern) {
-                console.error(chalk.red('Error: Missing pattern.'));
-                console.log(chalk.gray('Usage: crat gen <pattern> [options]'));
-                console.log(chalk.gray('Example: crat gen asti'));
+                console.error(chalk.red('Error: Missing custom char.'));
+                console.log(chalk.gray('Usage: crat gen -[custom char]'));
                 process.exit(1);
             }
 
@@ -101,24 +98,21 @@ if (cluster.isWorker) {
             const isStart = rawPos === 'start';
             const posName = isStart ? 'start' : 'end';
 
-            // Default: Case Insensitive (casen) is the default.
-            // Only be Case Sensitive if --casey (-y) is explicitly passed.
             const caseSensitive = options.casey === true;
 
             // 3. Validation
             if (pattern.length > 4) {
-                console.log(chalk.red(`Error: Pattern "${pattern}" exceeds 4 characters.`));
+                console.log(chalk.red(`Error: Custom char "${pattern}" exceeds 4 characters.`));
                 process.exit(1);
             }
 
             const invalidChars = pattern.split('').filter((c: string) => !BASE58_ALPHABET.includes(c));
             if (invalidChars.length > 0) {
-                console.log(chalk.red(`Error: Pattern contains invalid Base58 characters: "${invalidChars.join(', ')}"`));
+                console.log(chalk.red(`Error: Custom char contains invalid Base58 characters: "${invalidChars.join(', ')}"`));
                 process.exit(1);
             }
 
             // 4. UI Output (Hacker Style)
-            // No extra headers, just the command log
             console.log(chalk.white(`> crat --char "${pattern}" --pos "${posName}" --case "${caseSensitive ? 'sensitive' : 'insensitive'}"`));
             console.log(chalk.gray(`> initializing cluster_mode...`));
 
