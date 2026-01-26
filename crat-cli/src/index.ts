@@ -9,7 +9,7 @@ import readline from 'readline';
 import cluster from 'cluster';
 import os from 'os';
 
-const VERSION = '1.1.1';
+const VERSION = '1.2.1';
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 // --- Worker Logic ---
@@ -72,6 +72,14 @@ if (cluster.isWorker) {
         .name('crat')
         .version(VERSION, '-v, --version')
         .usage('gen -[custom char] -[position : start/end] -[case senseitive: casey for yes and casen for no]')
+        .addHelpText('after', `
+\n  Note:
+    crat gen -[custom char] 
+    (Position defaults to START. Case sensitivity defaults to NO.)
+
+  Web Version:
+    Visit https://asti-chain.com for the browser-based generator.
+`)
         .helpOption('-h, --help', 'display help for command');
 
     program
@@ -90,6 +98,7 @@ if (cluster.isWorker) {
             if (!pattern) {
                 console.error(chalk.red('Error: Missing custom char.'));
                 console.log(chalk.gray('Usage: crat gen -[custom char]'));
+                console.log(chalk.gray('(Defaults: Position=Start, Case=Insensitive)'));
                 process.exit(1);
             }
 
@@ -114,6 +123,7 @@ if (cluster.isWorker) {
 
             // 4. UI Output (Hacker Style)
             console.log(chalk.white(`> crat --char "${pattern}" --pos "${posName}" --case "${caseSensitive ? 'sensitive' : 'insensitive'}"`));
+            console.log(chalk.cyan(`> web_version: https://asti-chain.com`));
             console.log(chalk.gray(`> initializing cluster_mode...`));
 
             const numCPUs = os.cpus().length;
