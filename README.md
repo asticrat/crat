@@ -41,29 +41,30 @@ The CLI uses **Cluster Mode** to utilize all available CPU cores for mining.
 
 **General Syntax:**
 ```bash
-crat gen -[custom char] -[position : start/end] -[case senseitive: casey for yes and casen for no]
+crat gen --char <custom_char> [--pos start|end] [--case on|off]
 ```
 
 **Examples:**
 
 1.  **Quick Start** (Defaults: Start position, Case Insensitive)
     ```bash
-    crat gen asti
+    crat gen --char asti
     ```
 
 2.  **Specific Position** (End)
     ```bash
-    crat gen --char "cool" --pos "end"
+    crat gen --char cool --pos end
     ```
 
 3.  **Maximum Specificity** (Case Sensitive)
     ```bash
-    crat gen --char "Cool" --pos "end" --casey
+    crat gen --char Cool --pos end --case on
     ```
 
 ### CLI Features
 - **Cluster Mode**: Automatically spawns 10+ worker threads (depending on CPU) for 10x speed.
 - **Hacker UI**: Minimalist, tech-focused log output.
+- **Strict Validation**: Enforces valid options to prevent errors.
 - **Auto-Save**: Automatically saves result to `(char)_crat.txt`.
 - **Privacy**: Private keys are hidden by default (Press ENTER to reveal).
 
