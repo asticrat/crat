@@ -19,7 +19,7 @@ No installation required. Generate custom addresses directly in your browser.
 ---
 
 ## 2. CLI Tool (Terminal)
-For developers and power users who want maximum performance using their full CPU power.
+For users who want to run the generator locally from the terminal instead of accessing the web version.
 
 > **Note:** The source code for the CLI is located in the [`cli` branch](https://github.com/asticrat/crat/tree/cli) of this repository.
 
