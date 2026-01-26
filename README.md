@@ -1,53 +1,73 @@
-# Crat - Solana Vanity Address Generator
+# Crat - Solana Custom Address Generator
 
-## Overview
-**Crat** is a browser-based vanity address generator for the Solana blockchain. It allows users to generate custom wallet addresses (starting or ending with specific characters) directly in their browser without sending private keys over the network.
+**Crat** offers two powerful ways to generate custom (vanity) Solana wallet addresses: a high-speed **Web Interface** and a multi-threaded **CLI Tool**.
+
+---
+
+## 1. Web Interface (GUI)
+No installation required. Generate custom addresses directly in your browser.
 
 **Site:** [asti-chain.com](https://asti-chain.com)
 
-## Architecture
+**Features:**
+- **Zero-Install**: Works instantly in any modern browser.
+- **Glassmorphism UI**: Beautiful, futuristic design.
+- **Multi-Threaded**: Uses Web Workers to maximize browser performance.
+- **Secure**: Keys are generated client-side and never leave your device.
+- **Export**: Download keys as a `.txt` file valid for Phantom/Solflare.
 
-### 1. Core Technology Stack
-- **Framework**: React (Vite) for a fast, modern frontend.
-- **Styling**: TailwindCSS (or custom CSS variables) with a "Glassmorphism" UI design.
-- **Crypto Library**: `@solana/web3.js` for keypair generation.
-- **Encoding**: `bs58` for Base58 encoding of private keys.
+---
 
-### 2. Multi-Threaded Performance
-To maximize generation speed, Crat uses a **Worker Pool** architecture:
-- **Main Thread**: Handles UI updates, user input, and state management. It spawns multiple Web Workers equal to the user's CPU core count (`navigator.hardwareConcurrency`).
-- **Web Workers (`vanity.worker.ts`)**: Each worker runs an infinite loop generating random Ed25519 keypairs. 
-- **Message Passing**: Workers report their progress (attempt counts) back to the main thread in batches to minimize message overhead. When a match is found, the successful worker sends the keypair to the main thread, and all other workers are terminated.
+## 2. CLI Tool (Terminal)
+For developers and power users who want maximum performance using their full CPU power.
 
-### 3. Security
-- **Client-Side Only**: All key generation happens entirely within the user's browser. Private keys are **never** sent to any server.
-- **Ephemeral State**: Keys are held in memory only for the duration of the session and cleared upon reset or page reload.
-- **Safe Export**: Private keys can be downloaded as a Base58-encoded string in a `.txt` file, compatible with major Solana wallets (Phantom, Solflare).
+> **Note:** The source code for the CLI is located in the [`cli` branch](https://github.com/asticrat/crat/tree/cli) of this repository.
 
-### 4. UI/UX Design
-- **Terminal Aesthetic**: The interface mimics a sleek, futuristic terminal with a glass-like transparency effect.
-- **Real-Time Feedback**: Shows live "addresses scanned" counters aggregated from all worker threads.
-- **Responsive**: Adapts to different screen sizes while maintaining the immersive aesthetic.
+### Installation
 
-## Development
-
-### Prerequisites
-- Node.js (v18+)
-- npm or yarn
-
-### Setup
+**Option A: NPM (Recommended)**
 ```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+npm install -g crat-cli
 ```
 
-### Build for Production
+**Option B: Homebrew (Mac/Linux)**
 ```bash
-npm run build
+brew tap asticrat/crat
+brew install crat
 ```
+
+### Usage
+The CLI uses **Cluster Mode** to utilize all available CPU cores for mining.
+
+**General Syntax:**
+```bash
+crat gen -[custom char] -[position : start/end] -[case senseitive: casey for yes and casen for no]
+```
+
+**Examples:**
+
+1.  **Quick Start** (Defaults: Start position, Case Insensitive)
+    ```bash
+    crat gen asti
+    ```
+
+2.  **Specific Position** (End)
+    ```bash
+    crat gen --char "cool" --pos "end"
+    ```
+
+3.  **Maximum Specificity** (Case Sensitive)
+    ```bash
+    crat gen --char "Cool" --pos "end" --casey
+    ```
+
+### CLI Features
+- **Cluster Mode**: Automatically spawns 10+ worker threads (depending on CPU) for 10x speed.
+- **Hacker UI**: Minimalist, tech-focused log output.
+- **Auto-Save**: Automatically saves result to `(char)_crat.txt`.
+- **Privacy**: Private keys are hidden by default (Press ENTER to reveal).
+
+---
 
 ## License
-Apache 2.0
+ISC
