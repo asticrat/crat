@@ -5,6 +5,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import fs from 'fs';
+import bs58 from 'bs58';
+import readline from 'readline';
 
 const program = new Command();
 
@@ -14,9 +16,10 @@ program
     .version('1.0.0');
 
 program
-    .command('run')
+    .command('gen')
+    .alias('generate')
     .description('Generate a vanity address')
-    .argument('<pattern>', 'The pattern to search for') // Positional argument for pattern
+    .argument('<pattern>', 'The pattern to search for (e.g. "asti")')
     .option('-s, --start', 'Search for pattern at the start (default)')
     .option('-e, --end', 'Search for pattern at the end')
     .option('-i, --ignore-case', 'Use case-insensitive search')
@@ -25,12 +28,13 @@ program
         const isStart = !end; // Default to start if end is not specified
         const caseSensitive = !ignoreCase;
 
+        // Display Header
         console.log(chalk.cyan(`
       ____ ____  ____  _____ 
-     / ___|  _ \|  _ \|_   _|
+     / ___|  _ \\|  _ \\|   _|
     | |   | |_) | |_) | | |  
     | |___|  _ <|  _ <  | |  
-     \____|_| \_\_| \_\ |_|  
+     \\____|_| \\_\\|_| \\_\\ |_|  
     
     Solana Vanity Address Generator
     `));
@@ -62,18 +66,40 @@ program
                 }
 
                 if (isMatch) {
-                    spinner.succeed(chalk.green('Address Found!'));
                     const duration = (Date.now() - startTime) / 1000;
+                    spinner.succeed(chalk.green('Address Found!'));
+
+                    const secretKeyBase58 = bs58.encode(keypair.secretKey);
+
+                    // Auto-Save
+                    const fileName = `${pattern}_crat.txt`;
+                    const fileContent = `Address: ${pubKey}\nPrivate Key: ${secretKeyBase58}`;
+                    fs.writeFileSync(fileName, fileContent);
 
                     console.log(chalk.yellow('\n----------------------------------------'));
                     console.log(chalk.white(`Public Key: `) + chalk.greenBright(pubKey));
-                    console.log(chalk.white(`Private Key (Uint8Array): `) + chalk.magenta(`[${keypair.secretKey.toString()}]`));
+                    console.log(chalk.white(`Saved to: `) + chalk.cyan(fileName));
                     console.log(chalk.yellow('----------------------------------------'));
                     console.log(chalk.gray(`Attempts: ${attempts.toLocaleString()}`));
                     console.log(chalk.gray(`Duration: ${duration.toFixed(2)}s`));
-                    console.log(chalk.gray(`Speed: ${Math.floor(attempts / duration).toLocaleString()} addr/s`));
 
-                    process.exit(0);
+                    // Reveal Mechanism
+                    console.log(chalk.gray('\nPrivate Key is hidden.'));
+                    const rl = readline.createInterface({
+                        input: process.stdin,
+                        output: process.stdout
+                    });
+
+                    rl.question(chalk.white('Press ') + chalk.bold('ENTER') + chalk.white(' to reveal private key...'), () => {
+                        console.log(chalk.yellow('\n----------------------------------------'));
+                        console.log(chalk.white(`Private Key (Base58): `));
+                        console.log(chalk.magenta(secretKeyBase58));
+                        console.log(chalk.yellow('----------------------------------------'));
+                        console.log(chalk.red.bold('WARNING: Never share your private key with anyone!'));
+                        rl.close();
+                        process.exit(0);
+                    });
+                    break;
                 }
 
                 attempts++;
