@@ -9,7 +9,7 @@ import readline from 'readline';
 import cluster from 'cluster';
 import os from 'os';
 
-const VERSION = '1.0.3';
+const VERSION = '1.1.0';
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 // --- Worker Logic ---
@@ -57,7 +57,7 @@ if (cluster.isWorker) {
                     }
                 }
             } catch (err) {
-                // Silent fail in worker, master handles timeouts/errors
+                // Silent fail in worker
             }
         } else if (msg.cmd === 'EXIT') {
             process.exit(0);
@@ -70,56 +70,56 @@ if (cluster.isWorker) {
 
     program
         .name('crat')
-        .description('Solana Vanity Address Generator CLI')
-        .version(VERSION);
+        .version(VERSION, '-v, --version') // Enable -v
+        .usage('gen [options] [pattern]')
+        .helpOption('-h, --help', 'display help for command');
+
+    // Remove default description to clean up help
+    // program.description('') -> creates empty line, maybe avoid calling description at all
 
     program
         .command('gen')
-        .alias('generate')
         .description('Generate a vanity address')
-        .argument('[pattern]', 'The pattern to search for') // Optional positional
+        .argument('[pattern]', 'The pattern to search for')
         .option('--char <pattern>', 'The pattern to search for (Alternative to positional)')
-        .option('--pos <position>', 'Position: "start" or "end"', 'start')
-        .option('--casey', 'Case Sensitive search')
-        .option('--casen', 'Case Insensitive search') // No default value here, logic handles it
+        .option('-p, --pos <position>', 'Position: "start" or "end"', 'start')
+        .option('-y, --casey', 'Case Sensitive search')
+        .option('-n, --casen', 'Case Insensitive search')
         .action(async (posPattern, options) => {
-            // 1. Resolve Arguments
+            // 1. Resolve Pattern
             let pattern = posPattern || options.char;
 
             if (!pattern) {
-                console.error(chalk.red('Error: Missing pattern. Provide it as an argument or use --char.'));
-                console.log('e.g., crat gen asti');
+                console.error(chalk.red('Error: Missing pattern.'));
+                console.log(chalk.gray('Usage: crat gen <pattern> [options]'));
+                console.log(chalk.gray('Example: crat gen asti'));
                 process.exit(1);
             }
 
             // 2. Resolve Flags
-            const rawPos = options.pos.toLowerCase();
+            const rawPos = (options.pos || 'start').toLowerCase();
             const isStart = rawPos === 'start';
-
-            // Default: Case Insensitive (casen) is TRUE unless casey is explicit
-            // casey flag overrides default
-            const caseSensitive = options.casey === true;
-            const modeName = caseSensitive ? 'Case Sensitive' : 'Case Insensitive';
-
             const posName = isStart ? 'start' : 'end';
+
+            // Default: Case Insensitive (casen) is the default.
+            // Only be Case Sensitive if --casey (-y) is explicitly passed.
+            const caseSensitive = options.casey === true;
 
             // 3. Validation
             if (pattern.length > 4) {
                 console.log(chalk.red(`Error: Pattern "${pattern}" exceeds 4 characters.`));
-                console.log(chalk.yellow(`Limit is 4 characters for performance reasons.`));
                 process.exit(1);
             }
 
             const invalidChars = pattern.split('').filter((c: string) => !BASE58_ALPHABET.includes(c));
             if (invalidChars.length > 0) {
-                // Even validation is strict on input chars always
                 console.log(chalk.red(`Error: Pattern contains invalid Base58 characters: "${invalidChars.join(', ')}"`));
-                console.log(chalk.yellow(`Base58 Note: 0, O, I, l are invalid characters.`));
                 process.exit(1);
             }
 
             // 4. UI Output (Hacker Style)
-            console.log(chalk.gray(`> crat --char "${pattern}" --pos "${posName}"`));
+            // No extra headers, just the command log
+            console.log(chalk.white(`> crat --char "${pattern}" --pos "${posName}" --case "${caseSensitive ? 'sensitive' : 'insensitive'}"`));
             console.log(chalk.gray(`> initializing cluster_mode...`));
 
             const numCPUs = os.cpus().length;
@@ -130,18 +130,13 @@ if (cluster.isWorker) {
             let workers: any[] = [];
             let isFound = false;
 
-            // Status Update Loop
             const spinner = {
-                text: '',
                 update: () => {
                     process.stdout.write(`\r${chalk.gray(`... mining_status: ${chalk.white.bold(totalAttempts.toLocaleString())} addresses scanned...`)}`);
                 }
             };
 
-            // Initial render
             spinner.update();
-
-            const startTime = Date.now();
 
             for (let i = 0; i < numCPUs; i++) {
                 const worker = cluster.fork();
@@ -159,10 +154,9 @@ if (cluster.isWorker) {
                         const secretKeyUint8 = new Uint8Array(secretKey);
                         const secretKeyBase58 = bs58.encode(secretKeyUint8);
 
-                        // Kill all workers
                         workers.forEach(w => w.kill());
 
-                        console.log('\n'); // Newline after progress
+                        console.log('\n'); // Newline
 
                         // Auto-Save
                         const fileName = `${pattern}_crat.txt`;
@@ -174,7 +168,6 @@ if (cluster.isWorker) {
                         console.log(chalk.gray(`Saved to: ${fileName}`));
                         console.log('');
 
-                        // Reveal
                         const rl = readline.createInterface({
                             input: process.stdin,
                             output: process.stdout
