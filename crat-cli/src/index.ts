@@ -9,11 +9,12 @@ import bs58 from 'bs58';
 import readline from 'readline';
 
 const program = new Command();
+const VERSION = '1.0.2';
 
 program
     .name('crat')
     .description('Solana Vanity Address Generator CLI')
-    .version('1.0.0');
+    .version(VERSION);
 
 program
     .command('gen')
@@ -22,29 +23,45 @@ program
     .argument('<pattern>', 'The pattern to search for (e.g. "asti")')
     .option('-s, --start', 'Search for pattern at the start (default)')
     .option('-e, --end', 'Search for pattern at the end')
-    .option('-i, --ignore-case', 'Use case-insensitive search')
+    .option('--casey', 'Case Sensitive search (default)')
+    .option('--casen', 'Case Insensitive search')
     .action((pattern, options) => {
-        const { start, end, ignoreCase } = options;
+        const { start, end, casey, casen } = options;
         const isStart = !end; // Default to start if end is not specified
-        const caseSensitive = !ignoreCase;
 
-        // Display Header
-        console.log(chalk.cyan(`
-      ____ ____  ____  _____ 
-     / ___|  _ \\|  _ \\|   _|
-    | |   | |_) | |_) | | |  
-    | |___|  _ <|  _ <  | |  
-     \\____|_| \\_\\|_| \\_\\ |_|  
-    
-    Solana Vanity Address Generator
-    `));
+        // Determine case sensitivity based on flags
+        // Default is Case Sensitive (casey) unless casen is explicitly provided
+        const caseSensitive = casen ? false : true;
+
+        // Base58 Validation
+        const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        const invalidChars = pattern.split('').filter((c: string) => !BASE58_ALPHABET.includes(c));
+
+        // Header
+        console.log(chalk.cyan(`\n--- crat-cli ${VERSION} ---\n`));
+
+        if (invalidChars.length > 0 && caseSensitive) {
+            console.log(chalk.red(`Error: Pattern contains invalid Base58 characters: "${invalidChars.join(', ')}"`));
+            console.log(chalk.yellow(`Base58 Note: 0, O, I, l are invalid characters.`));
+            process.exit(1);
+        }
+
+        // If case insensitive, we check validation on the pattern but acknowledge it will be lowercased for search logic
+        if (invalidChars.length > 0 && !caseSensitive) {
+            // Warn if insensitive search has invalid chars (though logic handles casing, Base58 strictness usually applies to the output)
+            // For vanitygen, usually we let it slide if insensitive since 'o' matches 'L' etc aren't standard.
+            // But strict Base58 means '0','O','I','l' don't exist period. 
+            // Warn user anyway.
+            console.log(chalk.yellow(`Warning: Pattern contains characters that are not in Base58. They will be ignored or matched leniently in insensitive mode.`));
+        }
 
         console.log(chalk.blue(`Target Pattern: ${chalk.bold(pattern)}`));
         console.log(chalk.blue(`Position: ${isStart ? 'Start' : 'End'}`));
-        console.log(chalk.blue(`Case Sensitive: ${caseSensitive ? 'Yes' : 'No'}`));
+        console.log(chalk.blue(`Mode: ${caseSensitive ? 'Case Sensitive (casey)' : 'Case Insensitive (casen)'}`));
+        console.log(chalk.gray(`Base58 Note: 0, O, I, l are invalid characters.`));
         console.log('');
 
-        const spinner = ora('Searching for vanity address...').start();
+        const spinner = ora('Mining...').start();
 
         const startTime = Date.now();
         let attempts = 0;
@@ -106,11 +123,11 @@ program
                 if (attempts % REPORT_INTERVAL === 0) {
                     const currentDuration = (Date.now() - startTime) / 1000;
                     const speed = Math.floor(attempts / currentDuration);
-                    spinner.text = `Searching... | ${attempts.toLocaleString()} attempts | ${speed.toLocaleString()} addr/s`;
+                    spinner.text = `Mining... | ${attempts.toLocaleString()} attempts | ${speed.toLocaleString()} addr/s`;
                 }
             }
         } catch (error) {
-            spinner.fail(chalk.red('An error occurred during generation.'));
+            spinner.fail(chalk.red('An error occurred during mining.'));
             console.error(error);
             process.exit(1);
         }
