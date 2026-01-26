@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Keypair } from '@solana/web3.js';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import fs from 'fs';
 import bs58 from 'bs58';
@@ -9,7 +9,7 @@ import readline from 'readline';
 import cluster from 'cluster';
 import os from 'os';
 
-const VERSION = '1.2.1';
+const VERSION = '1.3.0';
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 // --- Worker Logic ---
@@ -68,48 +68,46 @@ if (cluster.isWorker) {
     // --- Master Logic ---
     const program = new Command();
 
+    // Configure clean help by removing auto-generated clutter
     program
         .name('crat')
-        .version(VERSION, '-v, --version')
-        .usage('gen -[custom char] -[position : start/end] -[case senseitive: casey for yes and casen for no]')
-        .addHelpText('after', `
-\n  Note:
-    crat gen -[custom char] 
-    (Position defaults to START. Case sensitivity defaults to NO.)
-
-  Web Version:
-    Visit https://asti-chain.com for the browser-based generator.
+        .version(VERSION, '-v, --version', 'Output the version number')
+        .helpOption('-h, --help', 'Display help for command')
+        .usage('') // Clear usage line to implement custom help
+        .description('') // Clear description
+        .addHelpText('beforeAll', `Commands:
+  crat gen --char <custom_char> [--pos start|end] [--case on|off]
+      Generate a custom address.
 `)
-        .helpOption('-h, --help', 'display help for command');
+        .addHelpText('after', `
+Notes:
+  • --char is mandatory for every command
+  • If --pos is not specified, it defaults to START
+  • If --case is not specified, case sensitivity is OFF
+
+Web Version:
+  Visit https://asti-chain.com for the browser-based generator
+`);
 
     program
-        .command('gen')
-        .description('Generate a custom address')
-        .usage('-[custom char] -[position : start/end] -[case senseitive: casey for yes and casen for no]')
-        .argument('[pattern]', 'The custom chars to search for')
-        .option('--char <pattern>', 'The custom chars to search for')
-        .option('-p, --pos <position>', 'Position: "start" or "end"', 'start')
-        .option('-y, --casey', 'Case Sensitive search')
-        .option('-n, --casen', 'Case Insensitive search')
-        .action(async (posPattern, options) => {
-            // 1. Resolve Pattern
-            let pattern = posPattern || options.char;
+        .command('gen', { isDefault: true }) // Make 'gen' default or strict? User said "crat gen ..."
+        .description('') // Clear generic description
+        .addOption(new Option('--char <custom_char>', 'Custom characters (required, max 4)').makeOptionMandatory(true))
+        .addOption(new Option('--pos <start|end>', 'Position of custom characters (default: start)').choices(['start', 'end']).default('start'))
+        .addOption(new Option('--case <on|off>', 'Case sensitivity (default: off)').choices(['on', 'off']).default('off'))
+        .action(async (options) => {
+            const pattern = options.char;
 
-            if (!pattern) {
-                console.error(chalk.red('Error: Missing custom char.'));
-                console.log(chalk.gray('Usage: crat gen -[custom char]'));
-                console.log(chalk.gray('(Defaults: Position=Start, Case=Insensitive)'));
-                process.exit(1);
-            }
+            // Note: commander .choices() handles validation for pos and case automatically,
+            // displaying an error if invalid values are passed.
 
-            // 2. Resolve Flags
-            const rawPos = (options.pos || 'start').toLowerCase();
+            const rawPos = options.pos;
+            const rawCase = options.case;
+
             const isStart = rawPos === 'start';
-            const posName = isStart ? 'start' : 'end';
+            const caseSensitive = rawCase === 'on';
 
-            const caseSensitive = options.casey === true;
-
-            // 3. Validation
+            // Validation (Manual check for length/Base58, Commander handles mandatory --char)
             if (pattern.length > 4) {
                 console.log(chalk.red(`Error: Custom char "${pattern}" exceeds 4 characters.`));
                 process.exit(1);
@@ -122,7 +120,7 @@ if (cluster.isWorker) {
             }
 
             // 4. UI Output (Hacker Style)
-            console.log(chalk.white(`> crat --char "${pattern}" --pos "${posName}" --case "${caseSensitive ? 'sensitive' : 'insensitive'}"`));
+            console.log(chalk.white(`> crat --char "${pattern}" --pos "${rawPos}" --case "${rawCase}"`));
             console.log(chalk.cyan(`> web_version: https://asti-chain.com`));
             console.log(chalk.gray(`> initializing cluster_mode...`));
 
