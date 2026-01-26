@@ -1,8 +1,8 @@
 class Crat < Formula
   desc "Solana Vanity Address Generator CLI"
   homepage "https://github.com/asticrat/crat"
-  url "https://registry.npmjs.org/crat-cli/-/crat-cli-1.1.1.tgz"
-  sha256 "9ef5df928f9ac69e21ca262bf8e1bc35dc64fd5a4a4dd9311050f045339be5d9"
+  url "https://registry.npmjs.org/crat-cli/-/crat-cli-1.2.1.tgz"
+  sha256 "3b6cd6ef908d55cda0fe02acb5c77d385562a5066c5764d39673cf0448d60cf7"
   license "ISC"
 
   depends_on "node"
