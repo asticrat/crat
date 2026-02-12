@@ -42,28 +42,6 @@ function App() {
   const totalAttemptsRef = useRef(0);
   const lastReportTimeRef = useRef(0);
 
-  useEffect(() => {
-    // Clean up on unmount
-    return () => terminateWorkers();
-  }, []);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [logs, step]);
-
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'c' && step === 'generating') {
-        e.preventDefault();
-        handleStop();
-      }
-    };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [step]);
-
   const addLog = (message: string, type: 'info' | 'success' | 'warn' | 'system' = 'info', overwrite = false) => {
     const newLog = { id: logIdCounter.current++, type, message };
     setLogs(prev => {
@@ -207,7 +185,7 @@ function App() {
     if (typeof result.secretKey === 'string') {
       content = `Chain: ${result.chain}\nAddress: ${result.publicKey}\nPrivate Key: ${result.secretKey}`; // WIF for BTC/BSV
     } else {
-      const encoded = bs58.encode(new Uint8Array(result.secretKey));
+      const encoded = bs58.encode(new Uint8Array(result.secretKey as number[]));
       content = `Chain: solana\nAddress: ${result.publicKey}\nPrivate Key: ${encoded}`; // Base58 for Solana
     }
 
@@ -239,6 +217,28 @@ function App() {
     setLogs([]);
     setError(null);
   };
+
+  useEffect(() => {
+    // Clean up on unmount
+    return () => terminateWorkers();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logs, step]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'c' && step === 'generating') {
+        e.preventDefault();
+        handleStop();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
