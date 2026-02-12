@@ -1,18 +1,59 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Keypair } from '@solana/web3.js';
-import * as bitcoin from 'bitcoinjs-lib';
-import { ECPairFactory } from 'ecpair';
+// @ts-expect-error tinysecp declaration
 import * as tinysecp from 'tiny-secp256k1';
-// @ts-expect-error bsv lacks types
-import bsv from 'bsv';
 
-const ECPair = ECPairFactory(tinysecp);
-bitcoin.initEccLib(tinysecp);
+let bitcoin: any;
+let ECPairFactory: any;
+let bsv: any;
+let ECPair: any;
+let isInitialized = false;
 
-self.onmessage = (e) => {
+// Initialize libraries asynchronously
+async function initLibs(chain: string) {
+    if (isInitialized) return;
+
+    if (chain === 'bitcoin') {
+        try {
+            bitcoin = await import('bitcoinjs-lib');
+            const ecpairModule = await import('ecpair');
+            ECPairFactory = ecpairModule.ECPairFactory;
+
+            // tinysecp is imported statically to ensure WASM is loaded if possible
+            // but we might need to wait for it if it's async in some environments.
+            // Assuming tinysecp is ready or throws.
+
+            bitcoin.initEccLib(tinysecp);
+            ECPair = ECPairFactory(tinysecp);
+        } catch (e) {
+            console.error(e);
+            throw new Error(`Failed to load Bitcoin libraries: ${e}`);
+        }
+    } else if (chain === 'bsv') {
+        try {
+            // @ts-expect-error bsv lacks types
+            const bsvModule = await import('bsv');
+            bsv = bsvModule.default || bsvModule;
+        } catch (e) {
+            console.error(e);
+            throw new Error(`Failed to load Bitcoin SV library: ${e}`);
+        }
+    }
+    isInitialized = true;
+}
+
+self.onmessage = async (e: MessageEvent) => {
     const { pattern, position, chain = 'solana' } = e.data;
 
     // Pattern validation
     if (!pattern) return;
+
+    try {
+        await initLibs(chain);
+    } catch (err: any) {
+        self.postMessage({ type: 'ERROR', message: err.message || String(err) });
+        return;
+    }
 
     const target = pattern;
     const checkStart = position === 'start';
@@ -32,6 +73,7 @@ self.onmessage = (e) => {
                 pubKey = keypair.publicKey.toString();
                 secretKey = Array.from(keypair.secretKey);
             } else if (chain === 'bitcoin') {
+                if (!ECPair) throw new Error('Bitcoin lib not initialized');
                 const keypair = ECPair.makeRandom();
                 const { address } = bitcoin.payments.p2pkh({ pubkey: keypair.publicKey });
                 if (address) {
@@ -39,6 +81,7 @@ self.onmessage = (e) => {
                     secretKey = keypair.toWIF();
                 }
             } else if (chain === 'bsv') {
+                if (!bsv) throw new Error('BSV lib not initialized');
                 const privKey = bsv.PrivKey.fromRandom();
                 const pub = bsv.PubKey.fromPrivKey(privKey);
                 const addr = bsv.Address.fromPubKey(pub);
@@ -51,6 +94,7 @@ self.onmessage = (e) => {
             const checkAddr = pubKey.toLowerCase();
 
             let isMatch = false;
+
             if (checkStart) {
                 isMatch = checkAddr.startsWith(target);
             } else {
@@ -80,9 +124,12 @@ self.onmessage = (e) => {
                     payload: { attempts }
                 });
                 attempts = 0;
+
+                // Allow event loop to breathe for message processing (e.g. terminate)
+                await new Promise(resolve => setTimeout(resolve, 0));
             }
         }
-    } catch (err) {
-        self.postMessage({ type: 'ERROR', payload: err });
+    } catch (err: any) {
+        self.postMessage({ type: 'ERROR', message: err.message || String(err) });
     }
 };
