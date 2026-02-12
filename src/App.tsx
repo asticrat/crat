@@ -75,14 +75,11 @@ function App() {
         type: 'module'
       });
 
-      let workerReady = false;
-
       worker.onmessage = (e) => {
         const { type, payload } = e.data;
 
         if (type === 'READY') {
           console.log(`[MAIN] Worker ${i} is ready`);
-          workerReady = true;
           // Send work to the worker now that it's ready
           worker.postMessage({ pattern, position, chain });
           return;
