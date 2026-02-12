@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Info } from 'lucide-react';
 import bs58 from 'bs58';
 import { getInvalidChars } from './utils/validation';
+import { encrypt, generatePassword } from './utils/crypto';
 import './index.css';
 
 type Step = 'input_chain' | 'input_char' | 'input_pos' | 'generating' | 'result';
@@ -26,6 +27,7 @@ interface LogEntry {
 function App() {
   const [step, setStep] = useState<Step>('input_chain');
   const [chainInput, setChainInput] = useState('');
+
   const [selectedChain, setSelectedChain] = useState<Chain>('solana');
   const [char, setChar] = useState('');
   const [positionInput, setPositionInput] = useState('');
@@ -73,8 +75,18 @@ function App() {
         type: 'module'
       });
 
+      let workerReady = false;
+
       worker.onmessage = (e) => {
         const { type, payload } = e.data;
+
+        if (type === 'READY') {
+          console.log(`[MAIN] Worker ${i} is ready`);
+          workerReady = true;
+          // Send work to the worker now that it's ready
+          worker.postMessage({ pattern, position, chain });
+          return;
+        }
 
         if (type === 'STATUS') {
           totalAttemptsRef.current += payload.attempts;
@@ -105,14 +117,22 @@ function App() {
         }
       };
 
-      worker.postMessage({ pattern, position, chain });
+      worker.onerror = (error) => {
+        console.error('[MAIN] Worker error:', error);
+        addLog(`>> worker_error: ${error.message || 'unknown error'}`, 'warn');
+        terminateWorkers();
+        setError('Worker failed to initialize');
+        setStep('input_chain');
+      };
+
+      // Don't send work immediately - wait for READY signal
       workerPoolRef.current.push(worker);
     }
   };
 
   const handleChainSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const val = chainInput.trim().toUpperCase(); // Normalize to uppercase for check
+    const val = chainInput.trim().toUpperCase();
 
     let chain: Chain | null = null;
     if (['SOL', 'SOLANA'].includes(val)) chain = 'solana';
@@ -120,7 +140,7 @@ function App() {
     else if (['BSV', 'BITCOIN SV', 'BITCOINSV'].includes(val)) chain = 'bsv';
 
     if (!chain) {
-      setError('invalid_chain: use SOL, BTC, or BSV');
+      setError('invalid_protocol');
       setChainInput('');
       return;
     }
@@ -128,8 +148,10 @@ function App() {
     setSelectedChain(chain);
     setError(null);
     setStep('input_char');
-    addLog(`selected_chain: ${chain}`, 'info');
+    addLog(`network_selected: ${chain}`, 'info');
   };
+
+
 
   const handleCharSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,22 +194,45 @@ function App() {
     terminateWorkers();
     setStep('input_chain');
     setChainInput('');
+
     setChar('');
     setPositionInput('');
     addLog(`process_halted: state reset`, 'warn');
   };
 
-  const downloadKey = () => {
+  const downloadKey = async () => {
     if (!result) return;
     const filename = `${char}_${result.chain || 'wallet'}_crat.txt`;
 
-    let content = '';
+    let privateKeyRaw = '';
     if (typeof result.secretKey === 'string') {
-      content = `Chain: ${result.chain}\nAddress: ${result.publicKey}\nPrivate Key: ${result.secretKey}`; // WIF for BTC/BSV
+      privateKeyRaw = result.secretKey; // WIF for BTC/BSV
     } else {
-      const encoded = bs58.encode(new Uint8Array(result.secretKey as number[]));
-      content = `Chain: solana\nAddress: ${result.publicKey}\nPrivate Key: ${encoded}`; // Base58 for Solana
+      privateKeyRaw = bs58.encode(new Uint8Array(result.secretKey as number[])); // Base58 for Solana
     }
+
+    // Generate a random password for encryption
+    const password = generatePassword();
+
+    // Encrypt the private key
+    const encryptedKey = await encrypt(privateKeyRaw, password);
+
+    // Create content with encrypted key and password
+    const content = `Chain: ${result.chain}
+Address: ${result.publicKey}
+
+ENCRYPTED PRIVATE KEY:
+${encryptedKey}
+
+DECRYPTION PASSWORD:
+${password}
+
+⚠️  SECURITY NOTICE ⚠️
+Your private key has been encrypted using AES-256-GCM encryption.
+Store this file securely. Anyone with access to this file can decrypt your private key.
+To decrypt: Use the password above with the encrypted key.
+
+DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -210,6 +255,7 @@ function App() {
   const reset = () => {
     setStep('input_chain');
     setChainInput('');
+
     setChar('');
     setPositionInput('');
     setResult(null);
@@ -231,9 +277,23 @@ function App() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'c' && step === 'generating') {
+      // Handle Ctrl+C for both stopping generation and navigating back
+      if (e.ctrlKey && e.key === 'c') {
         e.preventDefault();
-        handleStop();
+        if (step === 'generating') {
+          handleStop();
+        } else if (step === 'input_char') {
+          setStep('input_chain');
+          setChainInput('');
+          setError(null);
+        } else if (step === 'input_pos') {
+          setStep('input_char');
+          setChar('');
+          setError(null);
+        } else if (step === 'result') {
+          reset();
+        }
+        return;
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -271,9 +331,9 @@ function App() {
 
               {(step === 'input_chain' || step === 'input_char' || step === 'input_pos' || step === 'generating' || step === 'result') && (
                 <div className="flex-1 flex flex-col">
-                  {/* Step 0: Chain Input */}
+                  {/* Step 0: Chain Selection */}
                   <div className="prompt-group flex items-center">
-                    <span className="prompt">select_chain (SOL/BTC/BSV)&gt;</span>
+                    <span className="prompt">select_network_protocol&gt;</span>
                     {step === 'input_chain' ? (
                       <form onSubmit={handleChainSubmit} className="inline-flex flex-1">
                         <input
@@ -286,7 +346,9 @@ function App() {
                         />
                       </form>
                     ) : (
-                      <span className="cmd-text">{selectedChain.toUpperCase()}</span>
+                      <div className="text-success font-bold">
+                        {selectedChain.toUpperCase()}
+                      </div>
                     )}
                   </div>
 
@@ -340,7 +402,19 @@ function App() {
                       animate={{ opacity: 1 }}
                       className="text-error mb-4"
                     >
-                      !! {error}
+                      {error === 'invalid_protocol' ? (
+                        <div className="flex flex-col">
+                          <span>!! invalid_protocol: incompatible_chain_detected</span>
+                          <span className="text-dim mt-2">compatible_protocols:</span>
+                          <div className="pl-4 mt-1 flex flex-col gap-1 text-dim">
+                            <span>&gt; SOLANA [SOL]</span>
+                            <span>&gt; BITCOIN [BTC]</span>
+                            <span>&gt; BITCOIN SV [BSV]</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span>!! {error}</span>
+                      )}
                     </motion.div>
                   )}
 

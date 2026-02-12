@@ -1,19 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Keypair } from '@solana/web3.js';
-// @ts-expect-error tinysecp declaration
+
 import * as tinysecp from 'tiny-secp256k1';
+
+console.log('[WORKER] Worker file loaded successfully');
 
 let bitcoin: any;
 let ECPairFactory: any;
 let bsv: any;
 let ECPair: any;
-let isInitialized = false;
+const initialized = {
+    bitcoin: false,
+    bsv: false
+};
 
 // Initialize libraries asynchronously
 async function initLibs(chain: string) {
-    if (isInitialized) return;
-
-    if (chain === 'bitcoin') {
+    if (chain === 'bitcoin' && !initialized.bitcoin) {
         try {
             bitcoin = await import('bitcoinjs-lib');
             const ecpairModule = await import('ecpair');
@@ -25,33 +28,41 @@ async function initLibs(chain: string) {
 
             bitcoin.initEccLib(tinysecp);
             ECPair = ECPairFactory(tinysecp);
+            initialized.bitcoin = true;
         } catch (e) {
             console.error(e);
             throw new Error(`Failed to load Bitcoin libraries: ${e}`);
         }
-    } else if (chain === 'bsv') {
+    } else if (chain === 'bsv' && !initialized.bsv) {
         try {
             // @ts-expect-error bsv lacks types
             const bsvModule = await import('bsv');
             bsv = bsvModule.default || bsvModule;
+            initialized.bsv = true;
         } catch (e) {
             console.error(e);
             throw new Error(`Failed to load Bitcoin SV library: ${e}`);
         }
     }
-    isInitialized = true;
 }
 
 self.onmessage = async (e: MessageEvent) => {
     const { pattern, position, chain = 'solana' } = e.data;
 
+    console.log('[WORKER] Received message:', { pattern, position, chain });
+
     // Pattern validation
-    if (!pattern) return;
+    if (!pattern) {
+        console.log('[WORKER] No pattern provided, ignoring message');
+        return;
+    }
 
     try {
         await initLibs(chain);
+        console.log('[WORKER] Libraries initialized for:', chain);
     } catch (err: any) {
-        self.postMessage({ type: 'ERROR', message: err.message || String(err) });
+        console.error('[WORKER] Init error:', err);
+        self.postMessage({ type: 'ERROR', payload: { message: err.message || String(err) } });
         return;
     }
 
@@ -59,9 +70,11 @@ self.onmessage = async (e: MessageEvent) => {
     const checkStart = position === 'start';
 
     let attempts = 0;
-    const REPORT_INTERVAL = 1000;
+    const REPORT_INTERVAL = 100; // Report every 100 attempts for faster UI feedback
 
     const startTime = Date.now();
+
+    console.log('[WORKER] Starting generation loop for chain:', chain);
 
     try {
         while (true) {
@@ -73,7 +86,10 @@ self.onmessage = async (e: MessageEvent) => {
                 pubKey = keypair.publicKey.toString();
                 secretKey = Array.from(keypair.secretKey);
             } else if (chain === 'bitcoin') {
-                if (!ECPair) throw new Error('Bitcoin lib not initialized');
+                if (!ECPair) {
+                    self.postMessage({ type: 'ERROR', payload: { message: 'Bitcoin lib not initialized' } });
+                    break;
+                }
                 const keypair = ECPair.makeRandom();
                 const { address } = bitcoin.payments.p2pkh({ pubkey: keypair.publicKey });
                 if (address) {
@@ -81,7 +97,10 @@ self.onmessage = async (e: MessageEvent) => {
                     secretKey = keypair.toWIF();
                 }
             } else if (chain === 'bsv') {
-                if (!bsv) throw new Error('BSV lib not initialized');
+                if (!bsv) {
+                    self.postMessage({ type: 'ERROR', payload: { message: 'BSV lib not initialized' } });
+                    break;
+                }
                 const privKey = bsv.PrivKey.fromRandom();
                 const pub = bsv.PubKey.fromPrivKey(privKey);
                 const addr = bsv.Address.fromPubKey(pub);
@@ -92,17 +111,19 @@ self.onmessage = async (e: MessageEvent) => {
             if (!pubKey) continue;
 
             const checkAddr = pubKey.toLowerCase();
+            const targetLower = target.toLowerCase();
 
             let isMatch = false;
 
             if (checkStart) {
-                isMatch = checkAddr.startsWith(target);
+                isMatch = checkAddr.startsWith(targetLower);
             } else {
-                isMatch = checkAddr.endsWith(target);
+                isMatch = checkAddr.endsWith(targetLower);
             }
 
             if (isMatch) {
                 const duration = (Date.now() - startTime) / 1000;
+                console.log('[WORKER] Match found!', { pubKey, attempts });
                 self.postMessage({
                     type: 'FOUND',
                     payload: {
@@ -119,6 +140,7 @@ self.onmessage = async (e: MessageEvent) => {
             attempts++;
             if (attempts >= REPORT_INTERVAL) {
                 // Report delta
+                console.log('[WORKER] Reporting status:', attempts);
                 self.postMessage({
                     type: 'STATUS',
                     payload: { attempts }
@@ -130,6 +152,10 @@ self.onmessage = async (e: MessageEvent) => {
             }
         }
     } catch (err: any) {
-        self.postMessage({ type: 'ERROR', message: err.message || String(err) });
+        self.postMessage({ type: 'ERROR', payload: { message: err.message || String(err) } });
     }
 };
+
+// Signal that the worker is ready to receive messages
+console.log('[WORKER] Sending READY signal');
+self.postMessage({ type: 'READY' });
