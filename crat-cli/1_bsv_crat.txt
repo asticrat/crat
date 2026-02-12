@@ -1,0 +1,3 @@
+Chain: bsv
+Address: 181dA7kPgxiWZzSoue6UvVYBnmWRYzaBNm
+Private Key: KwgZJQohrqMKQsEQoJCXmPbtn5kYAtADykQ1QxFC41L5psmTw5og

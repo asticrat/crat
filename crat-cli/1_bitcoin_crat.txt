@@ -1,0 +1,3 @@
+Chain: bitcoin
+Address: 1FtvCxXBHnaAsMEWntBGPDBPo8ThkBhG3e
+Private Key: L5XUZvGaftYutSNEM6uHUUFskFybSjyjYz6RSjzCgqcoeDGz6d3g
