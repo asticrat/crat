@@ -90,11 +90,15 @@ self.onmessage = async (e: MessageEvent) => {
         while (true) {
             let pubKey = '';
             let secretKey: number[] | string | null = null;
+            let mnemonic: string | null = null;
 
             if (chain === 'solana') {
                 const keypair = Keypair.generate();
                 pubKey = keypair.publicKey.toString();
                 secretKey = Array.from(keypair.secretKey);
+                // Note: Solana Keypair.generate() doesn't create from mnemonic by default
+                // We'll generate mnemonic separately if needed
+                mnemonic = null; // Solana uses raw keypair, not mnemonic by default
             } else if (chain === 'bitcoin') {
                 if (!ECPair) {
                     self.postMessage({ type: 'ERROR', payload: { message: 'Bitcoin lib not initialized' } });
@@ -106,6 +110,7 @@ self.onmessage = async (e: MessageEvent) => {
                     pubKey = address;
                     secretKey = keypair.toWIF();
                 }
+                mnemonic = null; // Bitcoin uses WIF format
             } else if (chain === 'bsv') {
                 if (!bsv) {
                     self.postMessage({ type: 'ERROR', payload: { message: 'BSV lib not initialized' } });
@@ -116,6 +121,7 @@ self.onmessage = async (e: MessageEvent) => {
                 const addr = bsv.Address.fromPubKey(pub);
                 pubKey = addr.toString();
                 secretKey = privKey.toWif().toString();
+                mnemonic = null; // BSV uses WIF format
             } else if (chain === 'ethereum') {
                 if (!ethers) {
                     self.postMessage({ type: 'ERROR', payload: { message: 'Ethereum lib not initialized' } });
@@ -124,6 +130,7 @@ self.onmessage = async (e: MessageEvent) => {
                 const wallet = ethers.Wallet.createRandom();
                 pubKey = wallet.address;
                 secretKey = wallet.privateKey;
+                mnemonic = wallet.mnemonic?.phrase || null; // Ethereum supports BIP39 mnemonic
             }
 
             if (!pubKey) continue;
@@ -149,6 +156,7 @@ self.onmessage = async (e: MessageEvent) => {
                     payload: {
                         publicKey: pubKey,
                         secretKey,
+                        mnemonic, // Include mnemonic phrase (will be null for BTC/BSV)
                         attempts,
                         duration,
                         chain

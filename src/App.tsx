@@ -15,6 +15,8 @@ interface GenResult {
   publicKey: string;
   encryptedSecretKey: string; // Encrypted private key (never store plain text)
   decryptionPassword: string; // Password to decrypt the private key
+  encryptedMnemonic?: string; // Encrypted mnemonic phrase (optional, for ETH)
+  mnemonicPassword?: string; // Password to decrypt mnemonic (optional, for ETH)
   attempts: number;
   duration: number;
   chain?: Chain;
@@ -101,7 +103,7 @@ function App() {
             }
           }
         } else if (type === 'FOUND') {
-          const foundPayload = payload as { publicKey: string; secretKey: number[] | string; attempts: number; duration: number; chain?: Chain };
+          const foundPayload = payload as { publicKey: string; secretKey: number[] | string; mnemonic?: string | null; attempts: number; duration: number; chain?: Chain };
           terminateWorkers();
 
           // SECURITY: Encrypt private key immediately, never store plain text
@@ -109,7 +111,7 @@ function App() {
             try {
               let privateKeyRaw = '';
               if (typeof foundPayload.secretKey === 'string') {
-                privateKeyRaw = foundPayload.secretKey; // WIF for BTC/BSV
+                privateKeyRaw = foundPayload.secretKey; // WIF for BTC/BSV or hex for ETH
               } else {
                 privateKeyRaw = bs58.encode(new Uint8Array(foundPayload.secretKey as number[])); // Base58 for Solana
               }
@@ -118,11 +120,22 @@ function App() {
               const password = generatePassword();
               const encryptedKey = await encrypt(privateKeyRaw, password);
 
+              // Encrypt mnemonic if it exists (for Ethereum)
+              let encryptedMnemonic: string | undefined;
+              let mnemonicPassword: string | undefined;
+
+              if (foundPayload.mnemonic) {
+                mnemonicPassword = generatePassword();
+                encryptedMnemonic = await encrypt(foundPayload.mnemonic, mnemonicPassword);
+              }
+
               // Store only encrypted version in state
               setResult({
                 publicKey: foundPayload.publicKey,
                 encryptedSecretKey: encryptedKey,
                 decryptionPassword: password,
+                encryptedMnemonic,
+                mnemonicPassword,
                 attempts: totalAttemptsRef.current,
                 duration: foundPayload.duration,
                 chain: foundPayload.chain || selectedChain
@@ -259,7 +272,7 @@ function App() {
     const filename = `${customName}_crat_${chainSymbol}.txt`;
 
     // SECURITY: Private key is already encrypted in state, just use it
-    const content = `Chain: ${result.chain}
+    let content = `Chain: ${result.chain}
 Address: ${result.publicKey}
 
 ENCRYPTED PRIVATE KEY:
@@ -267,8 +280,23 @@ ${result.encryptedSecretKey}
 
 DECRYPTION PASSWORD:
 ${result.decryptionPassword}
+`;
 
-⚠️  SECURITY NOTICE ⚠️
+    // Add mnemonic section if it exists (for Ethereum)
+    if (result.encryptedMnemonic && result.mnemonicPassword) {
+      content += `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ENCRYPTED MNEMONIC PHRASE (SEED PHRASE):
+${result.encryptedMnemonic}
+
+MNEMONIC DECRYPTION PASSWORD:
+${result.mnemonicPassword}
+
+`;
+    }
+
+    content += `⚠️  SECURITY NOTICE ⚠️
 Your private key has been encrypted using AES-256-GCM encryption.
 Store this file securely. Anyone with access to this file can decrypt your private key.
 To decrypt: Use the password above with the encrypted key.
