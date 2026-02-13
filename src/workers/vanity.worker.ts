@@ -47,9 +47,9 @@ async function initLibs(chain: string) {
 }
 
 self.onmessage = async (e: MessageEvent) => {
-    const { pattern, position, chain = 'solana' } = e.data;
+    const { pattern, position, chain = 'solana', caseSensitive = false } = e.data;
 
-    console.log('[WORKER] Received message:', { pattern, position, chain });
+    console.log('[WORKER] Received message:', { pattern, position, chain, caseSensitive });
 
     // Pattern validation
     if (!pattern) {
@@ -110,15 +110,16 @@ self.onmessage = async (e: MessageEvent) => {
 
             if (!pubKey) continue;
 
-            const checkAddr = pubKey.toLowerCase();
-            const targetLower = target.toLowerCase();
+            // Perform case-sensitive or case-insensitive matching based on the flag
+            const checkAddr = caseSensitive ? pubKey : pubKey.toLowerCase();
+            const targetToMatch = caseSensitive ? target : target.toLowerCase();
 
             let isMatch = false;
 
             if (checkStart) {
-                isMatch = checkAddr.startsWith(targetLower);
+                isMatch = checkAddr.startsWith(targetToMatch);
             } else {
-                isMatch = checkAddr.endsWith(targetLower);
+                isMatch = checkAddr.endsWith(targetToMatch);
             }
 
             if (isMatch) {

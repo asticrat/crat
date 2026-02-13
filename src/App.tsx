@@ -6,7 +6,7 @@ import { getInvalidChars } from './utils/validation';
 import { encrypt, generatePassword } from './utils/crypto';
 import './index.css';
 
-type Step = 'input_chain' | 'input_char' | 'input_pos' | 'generating' | 'result';
+type Step = 'input_chain' | 'input_char' | 'input_pos' | 'input_case' | 'generating' | 'result' | 'input_filename';
 type Position = 'start' | 'end';
 type Chain = 'solana' | 'bitcoin' | 'bsv';
 
@@ -31,6 +31,9 @@ function App() {
   const [selectedChain, setSelectedChain] = useState<Chain>('solana');
   const [char, setChar] = useState('');
   const [positionInput, setPositionInput] = useState('');
+  const [caseInput, setCaseInput] = useState('');
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [customName, setCustomName] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [result, setResult] = useState<GenResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,7 @@ function App() {
     workerPoolRef.current = [];
   };
 
-  const initWorkers = (pattern: string, position: Position, chain: Chain) => {
+  const initWorkers = (pattern: string, position: Position, chain: Chain, caseSensitive: boolean) => {
     terminateWorkers();
 
     totalAttemptsRef.current = 0;
@@ -81,7 +84,7 @@ function App() {
         if (type === 'READY') {
           console.log(`[MAIN] Worker ${i} is ready`);
           // Send work to the worker now that it's ready
-          worker.postMessage({ pattern, position, chain });
+          worker.postMessage({ pattern, position, chain, caseSensitive });
           return;
         }
 
@@ -177,14 +180,29 @@ function App() {
       return;
     }
 
-    const pos = val as Position;
+    setError(null);
+    setStep('input_case');
+  };
+
+  const handleCaseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = caseInput.toLowerCase().trim();
+    if (val !== 'yes' && val !== 'no') {
+      setError('invalid_input: type "yes" or "no"');
+      setCaseInput('');
+      return;
+    }
+
+    const isCaseSensitive = val === 'yes';
+    setCaseSensitive(isCaseSensitive);
+    const pos = positionInput as Position;
     setError(null);
     setStep('generating');
 
-    addLog(`crat --chain ${selectedChain} --char "${char}" --pos "${pos}"`, 'info');
+    addLog(`crat --chain ${selectedChain} --char "${char}" --pos "${pos}" --case-sensitive ${isCaseSensitive}`, 'info');
     addLog(`initializing cluster_mode...`);
 
-    initWorkers(char, pos, selectedChain);
+    initWorkers(char, pos, selectedChain, isCaseSensitive);
   };
 
   const handleStop = () => {
@@ -198,8 +216,9 @@ function App() {
   };
 
   const downloadKey = async () => {
-    if (!result) return;
-    const filename = `${char}_${result.chain || 'wallet'}_crat.txt`;
+    if (!result || !customName) return;
+    const chainSymbol = result.chain || 'wallet';
+    const filename = `${customName}_crat_${chainSymbol}.txt`;
 
     let privateKeyRaw = '';
     if (typeof result.secretKey === 'string') {
@@ -229,17 +248,42 @@ Your private key has been encrypted using AES-256-GCM encryption.
 Store this file securely. Anyone with access to this file can decrypt your private key.
 To decrypt: Use the password above with the encrypted key.
 
-DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
+NEVER share this file or password with anyone.
+Crat is not responsible for lost or stolen keys.
+`;
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
-    document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    addLog(`>> key_exported: ${filename}`, 'success');
+    setStep('result'); // Go back to result view
+  };
+
+  const handleFilenameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = customName.trim();
+    if (!name) {
+      setError('Please enter a filename');
+      return;
+    }
+    // Validate filename (no special characters except underscore and hyphen)
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+      setError('Filename can only contain letters, numbers, underscores, and hyphens');
+      return;
+    }
+    setError(null);
+    downloadKey();
+  };
+
+  const initiateDownload = () => {
+    setStep('input_filename');
+    setCustomName('');
+    setError(null);
   };
 
   const copyToClipboard = () => {
@@ -255,6 +299,8 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
 
     setChar('');
     setPositionInput('');
+    setCaseInput('');
+    setCaseSensitive(false);
     setResult(null);
     setAttempts(0);
     setLogs([]);
@@ -287,7 +333,11 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
           setStep('input_char');
           setChar('');
           setError(null);
-        } else if (step === 'result') {
+        } else if (step === 'input_case') {
+          setStep('input_pos');
+          setPositionInput('');
+          setError(null);
+        } else if (step === 'result' || step === 'input_filename') {
           reset();
         }
         return;
@@ -326,7 +376,7 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
                 <div className="text-dim text-sm mb-1">crat_os v3.1.2 (ultra_glass_build)</div>
               </motion.div>
 
-              {(step === 'input_chain' || step === 'input_char' || step === 'input_pos' || step === 'generating' || step === 'result') && (
+              {(step === 'input_chain' || step === 'input_char' || step === 'input_pos' || step === 'input_case' || step === 'generating' || step === 'result' || step === 'input_filename') && (
                 <div className="flex-1 flex flex-col">
                   {/* Step 0: Chain Selection */}
                   <div className="prompt-group flex items-center">
@@ -350,7 +400,7 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
                   </div>
 
                   {/* Step 1: Char Input */}
-                  {(step === 'input_char' || step === 'input_pos' || step === 'generating' || step === 'result') && (
+                  {(step === 'input_char' || step === 'input_pos' || step === 'input_case' || step === 'generating' || step === 'result' || step === 'input_filename') && (
                     <div className="prompt-group flex items-center">
                       <span className="prompt">input_char&gt;</span>
                       {step === 'input_char' ? (
@@ -358,7 +408,7 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
                           <input
                             type="text"
                             value={char}
-                            onChange={(e) => setChar(e.target.value.toLowerCase())}
+                            onChange={(e) => setChar(e.target.value)}
                             className="terminal-input"
                             autoFocus
                             maxLength={4}
@@ -372,7 +422,7 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
                   )}
 
                   {/* Step 2: Position Input */}
-                  {(step === 'input_pos' || step === 'generating' || step === 'result') && (
+                  {(step === 'input_pos' || step === 'input_case' || step === 'generating' || step === 'result' || step === 'input_filename') && (
                     <div className="prompt-group flex items-center">
                       <span className="prompt">input_position (start/end)&gt;</span>
                       {step === 'input_pos' ? (
@@ -388,6 +438,27 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
                         </form>
                       ) : (
                         <span className="cmd-text">{positionInput}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Step 3: Case Sensitivity Input */}
+                  {(step === 'input_case' || step === 'generating' || step === 'result' || step === 'input_filename') && (
+                    <div className="prompt-group flex items-center">
+                      <span className="prompt">case_sensitive (yes/no)&gt;</span>
+                      {step === 'input_case' ? (
+                        <form onSubmit={handleCaseSubmit} className="inline-flex flex-1">
+                          <input
+                            type="text"
+                            value={caseInput}
+                            onChange={(e) => setCaseInput(e.target.value.toLowerCase())}
+                            className="terminal-input"
+                            autoFocus
+                            placeholder=""
+                          />
+                        </form>
+                      ) : (
+                        <span className="cmd-text">{caseSensitive ? 'yes' : 'no'}</span>
                       )}
                     </div>
                   )}
@@ -462,12 +533,38 @@ DO NOT SHARE THIS FILE OR PASSWORD WITH ANYONE.`;
                         <span onClick={copyToClipboard} className="text-link">
                           {copied ? 'address_copied' : 'copy_address'}
                         </span>
-                        <span onClick={downloadKey} className="text-link">
+                        <span onClick={initiateDownload} className="text-link">
                           download_private_key
                         </span>
                         <span onClick={reset} className="text-link">
                           new_session
                         </span>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Filename Input Step */}
+                  {step === 'input_filename' && result && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-8"
+                    >
+                      <div className="prompt-group flex items-center">
+                        <span className="prompt">enter_filename&gt;</span>
+                        <form onSubmit={handleFilenameSubmit} className="inline-flex flex-1">
+                          <input
+                            type="text"
+                            value={customName}
+                            onChange={(e) => setCustomName(e.target.value.toLowerCase())}
+                            className="terminal-input"
+                            autoFocus
+                            placeholder="e.g. asti"
+                          />
+                        </form>
+                      </div>
+                      <div className="text-dim text-xs mt-2 ml-2">
+                        File will be saved as: {customName || '[name]'}_crat_{result.chain || 'wallet'}.txt
                       </div>
                     </motion.div>
                   )}
