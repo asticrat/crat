@@ -9,7 +9,7 @@ import './index.css';
 
 type Step = 'input_chain' | 'input_char' | 'input_pos' | 'input_case' | 'generating' | 'result' | 'input_filename';
 type Position = 'start' | 'end';
-type Chain = 'solana' | 'bitcoin' | 'bsv';
+type Chain = 'solana' | 'bitcoin' | 'bsv' | 'ethereum';
 
 interface GenResult {
   publicKey: string;
@@ -165,6 +165,7 @@ function App() {
     if (['SOL', 'SOLANA'].includes(val)) chain = 'solana';
     else if (['BTC', 'BITCOIN'].includes(val)) chain = 'bitcoin';
     else if (['BSV', 'BITCOIN SV', 'BITCOINSV'].includes(val)) chain = 'bsv';
+    else if (['ETH', 'ETHEREUM'].includes(val)) chain = 'ethereum';
 
     if (!chain) {
       setError('invalid_protocol');
@@ -188,10 +189,20 @@ function App() {
       setError('max_length: 4 characters');
       return;
     }
-    const invalid = getInvalidChars(char);
-    if (invalid.length > 0) {
-      setError(`invalid_charset: ${invalid.join(', ')} unavailable`);
-      return;
+
+    // Ethereum uses hexadecimal (0-9, a-f, A-F), others use Base58
+    if (selectedChain === 'ethereum') {
+      const hexPattern = /^[0-9a-fA-F]+$/;
+      if (!hexPattern.test(char)) {
+        setError('invalid_charset: Ethereum addresses use hex (0-9, a-f)');
+        return;
+      }
+    } else {
+      const invalid = getInvalidChars(char);
+      if (invalid.length > 0) {
+        setError(`invalid_charset: ${invalid.join(', ')} unavailable`);
+        return;
+      }
     }
 
     setError(null);
@@ -500,6 +511,7 @@ Crat is not responsible for lost or stolen keys.
                             <span>&gt; SOLANA [SOL]</span>
                             <span>&gt; BITCOIN [BTC]</span>
                             <span>&gt; BITCOIN SV [BSV]</span>
+                            <span>&gt; ETHEREUM [ETH]</span>
                           </div>
                         </div>
                       ) : (
@@ -597,7 +609,11 @@ Crat is not responsible for lost or stolen keys.
 
           <footer className="window-footer">
             <Info size={12} />
-            <span>Base58 Note: 0, O, I, l are invalid characters.</span>
+            <span>
+              {selectedChain === 'ethereum'
+                ? 'Ethereum: Addresses use hex (0-9, a-f). Case-sensitive option available.'
+                : 'Base58 Note: 0, O, I, l are invalid characters.'}
+            </span>
           </footer>
         </div>
       </div>

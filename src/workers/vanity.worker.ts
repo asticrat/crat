@@ -8,10 +8,12 @@ console.log('[WORKER] Worker file loaded successfully');
 let bitcoin: any;
 let ECPairFactory: any;
 let bsv: any;
+let ethers: any;
 let ECPair: any;
 const initialized = {
     bitcoin: false,
-    bsv: false
+    bsv: false,
+    ethereum: false
 };
 
 // Initialize libraries asynchronously
@@ -42,6 +44,14 @@ async function initLibs(chain: string) {
         } catch (e) {
             console.error(e);
             throw new Error(`Failed to load Bitcoin SV library: ${e}`);
+        }
+    } else if (chain === 'ethereum' && !initialized.ethereum) {
+        try {
+            ethers = await import('ethers');
+            initialized.ethereum = true;
+        } catch (e) {
+            console.error(e);
+            throw new Error(`Failed to load Ethereum library: ${e}`);
         }
     }
 }
@@ -106,6 +116,14 @@ self.onmessage = async (e: MessageEvent) => {
                 const addr = bsv.Address.fromPubKey(pub);
                 pubKey = addr.toString();
                 secretKey = privKey.toWif().toString();
+            } else if (chain === 'ethereum') {
+                if (!ethers) {
+                    self.postMessage({ type: 'ERROR', payload: { message: 'Ethereum lib not initialized' } });
+                    break;
+                }
+                const wallet = ethers.Wallet.createRandom();
+                pubKey = wallet.address;
+                secretKey = wallet.privateKey;
             }
 
             if (!pubKey) continue;

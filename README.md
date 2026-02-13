@@ -1,6 +1,6 @@
-# Crat - Solana Custom Address Generator
+# Crat - Multi-Chain Vanity Address Generator
 
-**Crat** offers two powerful ways to generate custom (vanity) Solana wallet addresses: a high-speed **Web Interface** and a multi-threaded **CLI Tool**.
+**Crat** offers two powerful ways to generate custom (vanity) wallet addresses for **Solana**, **Bitcoin**, **Bitcoin SV**, and **Ethereum**: a high-speed **Web Interface** and a multi-threaded **CLI Tool**.
 
 ---
 
@@ -9,12 +9,19 @@ No installation required. Generate custom addresses directly in your browser.
 
 **Site:** [asti-chain.com](https://asti-chain.com)
 
+**Supported Chains:**
+- **Solana (SOL)** - Base58 addresses
+- **Bitcoin (BTC)** - P2PKH addresses  
+- **Bitcoin SV (BSV)** - BSV addresses
+- **Ethereum (ETH)** - Hex addresses (0x...)
+
 **Features:**
 - **Zero-Install**: Works instantly in any modern browser.
 - **Glassmorphism UI**: Beautiful, futuristic design.
 - **Multi-Threaded**: Uses Web Workers to maximize browser performance.
 - **Secure**: Keys are generated client-side and never leave your device.
-- **Export**: Download keys as a `.txt` file valid for Phantom/Solflare.
+- **AES-256 Encryption**: All private keys are encrypted immediately.
+- **Export**: Download encrypted keys as a `.txt` file.
 
 ---
 
