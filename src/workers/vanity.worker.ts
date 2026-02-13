@@ -124,7 +124,8 @@ self.onmessage = async (e: MessageEvent) => {
 
             if (isMatch) {
                 const duration = (Date.now() - startTime) / 1000;
-                console.log('[WORKER] Match found!', { pubKey, attempts });
+                // SECURITY: Only log public key, never private key
+                console.log('[WORKER] Match found!', { publicKey: pubKey, attempts });
                 self.postMessage({
                     type: 'FOUND',
                     payload: {

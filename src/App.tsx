@@ -4,6 +4,7 @@ import { Info } from 'lucide-react';
 import bs58 from 'bs58';
 import { getInvalidChars } from './utils/validation';
 import { encrypt, generatePassword } from './utils/crypto';
+import { initSecurity } from './utils/security';
 import './index.css';
 
 type Step = 'input_chain' | 'input_char' | 'input_pos' | 'input_case' | 'generating' | 'result' | 'input_filename';
@@ -12,7 +13,8 @@ type Chain = 'solana' | 'bitcoin' | 'bsv';
 
 interface GenResult {
   publicKey: string;
-  secretKey: number[] | string;
+  encryptedSecretKey: string; // Encrypted private key (never store plain text)
+  decryptionPassword: string; // Password to decrypt the private key
   attempts: number;
   duration: number;
   chain?: Chain;
@@ -99,15 +101,40 @@ function App() {
             }
           }
         } else if (type === 'FOUND') {
-          const foundPayload = payload as GenResult;
+          const foundPayload = payload as { publicKey: string; secretKey: number[] | string; attempts: number; duration: number; chain?: Chain };
           terminateWorkers();
-          setResult({
-            ...foundPayload,
-            attempts: totalAttemptsRef.current,
-            chain // ensure chain is passed or preserved
-          });
-          setStep('result');
-          addLog(`>> match_found: ${foundPayload.publicKey}`, 'success');
+
+          // SECURITY: Encrypt private key immediately, never store plain text
+          (async () => {
+            try {
+              let privateKeyRaw = '';
+              if (typeof foundPayload.secretKey === 'string') {
+                privateKeyRaw = foundPayload.secretKey; // WIF for BTC/BSV
+              } else {
+                privateKeyRaw = bs58.encode(new Uint8Array(foundPayload.secretKey as number[])); // Base58 for Solana
+              }
+
+              // Generate encryption password and encrypt immediately
+              const password = generatePassword();
+              const encryptedKey = await encrypt(privateKeyRaw, password);
+
+              // Store only encrypted version in state
+              setResult({
+                publicKey: foundPayload.publicKey,
+                encryptedSecretKey: encryptedKey,
+                decryptionPassword: password,
+                attempts: totalAttemptsRef.current,
+                duration: foundPayload.duration,
+                chain: foundPayload.chain || selectedChain
+              });
+              setStep('result');
+              addLog(`>> match_found: ${foundPayload.publicKey}`, 'success');
+            } catch (err) {
+              console.error('[SECURITY] Encryption failed:', err);
+              setError('Failed to secure private key');
+            }
+          })();
+
 
         } else if (type === 'ERROR') {
           terminateWorkers();
@@ -220,28 +247,15 @@ function App() {
     const chainSymbol = result.chain || 'wallet';
     const filename = `${customName}_crat_${chainSymbol}.txt`;
 
-    let privateKeyRaw = '';
-    if (typeof result.secretKey === 'string') {
-      privateKeyRaw = result.secretKey; // WIF for BTC/BSV
-    } else {
-      privateKeyRaw = bs58.encode(new Uint8Array(result.secretKey as number[])); // Base58 for Solana
-    }
-
-    // Generate a random password for encryption
-    const password = generatePassword();
-
-    // Encrypt the private key
-    const encryptedKey = await encrypt(privateKeyRaw, password);
-
-    // Create content with encrypted key and password
+    // SECURITY: Private key is already encrypted in state, just use it
     const content = `Chain: ${result.chain}
 Address: ${result.publicKey}
 
 ENCRYPTED PRIVATE KEY:
-${encryptedKey}
+${result.encryptedSecretKey}
 
 DECRYPTION PASSWORD:
-${password}
+${result.decryptionPassword}
 
 ⚠️  SECURITY NOTICE ⚠️
 Your private key has been encrypted using AES-256-GCM encryption.
@@ -308,6 +322,14 @@ Crat is not responsible for lost or stolen keys.
   };
 
   useEffect(() => {
+    // Initialize security measures
+    initSecurity({
+      disableDevTools: true,
+      disableContextMenu: true,
+      disableShortcuts: true,
+      antiDebug: false, // Set to true for maximum security (can be annoying during development)
+    });
+
     // Clean up on unmount
     return () => terminateWorkers();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
