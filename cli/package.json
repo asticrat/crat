@@ -1,0 +1,42 @@
+{
+    "name": "crat",
+    "version": "2.0.0",
+    "description": "Multi-chain vanity address generator with encryption support (Solana, Bitcoin, BSV, Ethereum)",
+    "main": "crat.js",
+    "bin": {
+        "crat": "./crat.js"
+    },
+    "keywords": [
+        "solana",
+        "bitcoin",
+        "ethereum",
+        "vanity",
+        "address",
+        "generator",
+        "crypto",
+        "wallet",
+        "mnemonic",
+        "encryption"
+    ],
+    "author": "asticrat",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/asticrat/crat.git"
+    },
+    "homepage": "https://asti-chain.com",
+    "engines": {
+        "node": ">=16.0.0"
+    },
+    "dependencies": {
+        "@solana/web3.js": "^1.99.0",
+        "bitcoinjs-lib": "^7.0.0-rc.0",
+        "bs58": "^6.0.0",
+        "bsv": "^2.0.10",
+        "chalk": "^4.1.2",
+        "commander": "^12.0.0",
+        "ecpair": "^3.0.1",
+        "ethers": "^6.16.0",
+        "tiny-secp256k1": "^2.2.3"
+    }
+}

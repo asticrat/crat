@@ -26,56 +26,114 @@ No installation required. Generate custom addresses directly in your browser.
 ---
 
 ## 2. CLI Tool (Terminal)
-For users who want to run the generator locally from the terminal instead of accessing the web version.
-
-> **Note:** The source code for the CLI is located in the [`cli` branch](https://github.com/asticrat/crat/tree/cli) of this repository.
+High-performance command-line tool with encryption support and multi-chain compatibility.
 
 ### Installation
 
-**Option A: NPM (Recommended)**
 ```bash
-npm install -g crat-cli
+npm install -g crat
 ```
 
-**Option B: Homebrew (Mac/Linux)**
+### Features
+- **4 Blockchains**: Solana, Bitcoin, BSV, Ethereum
+- **AES-256 Encryption**: Secure key storage (optional)
+- **Mnemonic Support**: 12-word seed phrases for Ethereum
+- **Built-in Decryption**: Decrypt keys with `crat decrypt`
+- **Multi-Threaded**: Uses all CPU cores
+- **User Choice**: Save encrypted or plain text keys
+
+### Quick Start
+
 ```bash
-brew tap asticrat/crat
-brew install crat
+# Generate Ethereum vanity address (encrypted)
+crat gen --char cafe --chain ethereum
+
+# Generate Solana address (plain text)
+crat gen --char asti --encrypt off
+
+# Decrypt saved keys
+crat decrypt
 ```
 
 ### Usage
-The CLI uses **Cluster Mode** to utilize all available CPU cores for mining.
 
-**General Syntax:**
 ```bash
-crat gen --char <custom_char> [--pos start|end] [--case on|off]
+# Basic syntax
+crat gen --char <pattern> [options]
+
+# Options:
+#   --char <pattern>      Pattern to search for (required, max 4 chars)
+#   --pos <start|end>     Position (default: start)
+#   --case <on|off>       Case sensitivity (default: off)
+#   --chain <blockchain>  solana|bitcoin|bsv|ethereum (default: solana)
+#   --encrypt <on|off>    Encryption mode (default: on)
+
+# Examples:
+crat gen --char asti                           # Solana, encrypted
+crat gen --char cafe --chain eth               # Ethereum, encrypted
+crat gen --char 1337 --chain btc --encrypt off # Bitcoin, plain text
+crat gen --char moon --pos end --case on       # Case-sensitive, end position
 ```
 
-**Examples:**
+### Decryption
 
-1.  **Quick Start** (Defaults: Start position, Case Insensitive)
-    ```bash
-    crat gen --char asti
-    ```
+```bash
+crat decrypt
+```
 
-2.  **Specific Position** (End)
-    ```bash
-    crat gen --char cool --pos end
-    ```
+Follow the interactive prompts to decrypt your saved keys.
 
-3.  **Maximum Specificity** (Case Sensitive)
-    ```bash
-    crat gen --char Cool --pos end --case on
-    ```
-
-### CLI Features
-- **Cluster Mode**: Automatically spawns 10+ worker threads (depending on CPU) for 10x speed.
-- **Hacker UI**: Minimalist, tech-focused log output.
-- **Strict Validation**: Enforces valid options to prevent errors.
-- **Auto-Save**: Automatically saves result to `(char)_crat.txt`.
-- **Privacy**: Private keys are hidden by default (Press ENTER to reveal).
+**Full CLI documentation**: See [`cli/README.md`](cli/README.md)
 
 ---
 
-## License
-ISC
+## 🔐 Security Features
+
+Both web and CLI versions include:
+- **AES-256-GCM Encryption**: Military-grade encryption
+- **Client-Side Generation**: Keys never leave your device
+- **Anti-Inspection**: Protection against DevTools and network sniffing
+- **Dual Encryption**: Separate passwords for private key and mnemonic
+- **No Logging**: Private keys never logged to console
+
+---
+
+## 📊 Supported Chains
+
+| Chain | Web | CLI | Address Format | Mnemonic |
+|-------|-----|-----|----------------|----------|
+| Solana (SOL) | ✅ | ✅ | Base58 | ❌ |
+| Bitcoin (BTC) | ✅ | ✅ | Base58 (P2PKH) | ❌ |
+| Bitcoin SV (BSV) | ✅ | ✅ | Base58 | ❌ |
+| Ethereum (ETH) | ✅ | ✅ | Hex (0x...) | ✅ 12 words |
+
+---
+
+## 🚀 Development
+
+```bash
+# Clone repository
+git clone https://github.com/asticrat/crat.git
+cd crat
+
+# Install dependencies
+npm install
+
+# Run web version locally
+npm run dev
+
+# Build for production
+npm run build
+```
+
+---
+
+## 📄 License
+
+MIT
+
+---
+
+## ⚠️ Disclaimer
+
+This tool generates cryptographic keys. The authors are not responsible for lost, stolen, or compromised keys. Always store your private keys securely and never share them with anyone.
